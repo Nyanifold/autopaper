@@ -30,17 +30,18 @@ reference-works/
 
 ## Add a new work (optional)
 
-Commands live in `autopaper/scripts/` (run from `autopaper/` as `python3 scripts/<cmd>.py`); all accept `--root <this directory>`:
+Commands live in `autopaper/` (this repo). The most common entry is the one-shot wrapper, runnable from anywhere (bash/zsh); all commands accept `--root <this directory>`:
 
 ```bash
-python3 scripts/collect.py --root <reference-works> <arxiv-url|pdf-path> [--repo owner/repo]
-python3 scripts/add.py     --root <reference-works> <source>   # submit only, run later
-python3 scripts/run.py     --root <reference-works>            # process pending tasks
-python3 scripts/status.py  --root <reference-works>            # pipeline status
+autopaper/collect.sh --root <reference-works> <arxiv-url|pdf-path> [--repo owner/repo] [--doi …]
+autopaper/collect.sh --root <reference-works> --inbox <name>.pdf [--repo …]   # metadata for a PDF in _inbox
+autopaper/scripts/add.py  --root <reference-works> <source>   # submit only, run later
+autopaper/scripts/run.py  --root <reference-works>            # process pending tasks
+autopaper/scripts/status.py --root <reference-works>          # pipeline status
 ```
 
 Or simply drop a PDF / a `.url` file (one URL or arXiv id per line) into `_inbox/`; it will be processed on the next `run.py`. Duplicates are detected automatically — re-submitting an existing work is a no-op that returns the existing id.
 
 Note: figure captions and tables may be lost or out of order in the MinerU conversion; when a number matters, cross-check the PDF.
 
-**If the PDF download fails** (paywall, broken link, network restrictions — the task will end as `rejected`/`failed` at the fetching stage): do not retry blindly. Ask the user to download the PDF manually and hand you the file, then submit the local path instead — `collect.py --root <reference-works> /path/to/paper.pdf` or drop the file into `_inbox/`. If you know its DOI, pass it explicitly (`--doi 10.xxxx/…`) so the paper gets a canonical `doi-…` id and full metadata instead of a `file-<hash>` fallback.
+**If the PDF download fails** (paywall, broken link, network restrictions — the task will end as `rejected`/`failed` at the fetching stage): do not retry blindly. Ask the user to download the PDF manually and hand you the file, then submit the local path instead — `autopaper/collect.sh --root <reference-works> /path/to/paper.pdf` or drop the file into `_inbox/`. If you know its DOI, pass it explicitly (`--doi 10.xxxx/…`) so the paper gets a canonical `doi-…` id and full metadata instead of a `file-<hash>` fallback.

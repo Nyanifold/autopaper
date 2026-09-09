@@ -30,17 +30,18 @@ reference-works/
 
 ## 新增一篇（可选）
 
-命令在 `autopaper/scripts/`（从 `autopaper/` 下以 `python3 scripts/<cmd>.py` 运行），都接受 `--root <本目录>`：
+命令在本仓库的 `autopaper/` 下。最常用的一键入口可在任意目录运行（bash/zsh）；所有命令都接受 `--root <本目录>`：
 
 ```bash
-python3 scripts/collect.py --root <reference-works> <arxiv-url|pdf路径> [--repo owner/repo]
-python3 scripts/add.py     --root <reference-works> <source>   # 只投递，稍后跑
-python3 scripts/run.py     --root <reference-works>            # 处理待办任务
-python3 scripts/status.py  --root <reference-works>            # 查看流水线状态
+autopaper/collect.sh --root <reference-works> <arxiv-url|pdf路径> [--repo owner/repo] [--doi …]
+autopaper/collect.sh --root <reference-works> --inbox <name>.pdf [--repo …]   # 给 _inbox 里的 PDF 补元信息
+autopaper/scripts/add.py  --root <reference-works> <source>   # 只投递，稍后跑
+autopaper/scripts/run.py  --root <reference-works>            # 处理待办任务
+autopaper/scripts/status.py --root <reference-works>          # 查看流水线状态
 ```
 
 也可以直接把 PDF 或 `.url` 文件（单行 URL 或 arXiv id）丢进 `_inbox/`，下次 `run.py` 时自动处理。重复投递会被自动判重——重投同一篇不会重复干活，只返回已有 id。
 
 注意：MinerU 转化可能丢失或打乱图注与表格；关键数字请对照 PDF 核实。
 
-**如果 PDF 下载失败**（付费墙、链接失效、网络限制——任务会在 fetching 阶段以 `rejected`/`failed` 告终）：不要盲目重试。请用户手动下载 PDF 并把文件交给你，然后用本地路径投递——`collect.py --root <reference-works> /path/to/paper.pdf`，或直接把文件丢进 `_inbox/`。若知道它的 DOI，用 `--doi 10.xxxx/…` 显式提供——这样得到规范的 `doi-…` id 并能抓到完整元信息，而不是退化为 `file-<hash>`。
+**如果 PDF 下载失败**（付费墙、链接失效、网络限制——任务会在 fetching 阶段以 `rejected`/`failed` 告终）：不要盲目重试。请用户手动下载 PDF 并把文件交给你，然后用本地路径投递——`autopaper/collect.sh --root <reference-works> /path/to/paper.pdf`，或直接把文件丢进 `_inbox/`。若知道它的 DOI，用 `--doi 10.xxxx/…` 显式提供——这样得到规范的 `doi-…` id 并能抓到完整元信息，而不是退化为 `file-<hash>`。
