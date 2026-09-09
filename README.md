@@ -2,19 +2,28 @@
 
 `autopaper` collects research works (papers / preprints / code projects) into a structured, deduplicated library. Each submitted work is downloaded, converted to Markdown (via MinerU), enriched with bibliographic metadata, and indexed — a fully deterministic script pipeline with no LLM and no human gate. Summarization is an optional, decoupled stage carried out by an agent on demand.
 
-This directory is the **code root** (scripts + prompts + docs, flat layout). Data lives in a separate **data root** (default `references/reference-works/`), selectable per command with `--root`.
+This directory is the **code root** (scripts + prompts + docs, flat layout). Data lives in a separate **data root** (default `./reference-works/`, i.e. under the directory where you run the command), selectable per command with `--root`.
 
 ## Quick start
 
+### 0. Prerequisite: MinerU API token
+
+autopaper converts PDFs via the [MinerU](https://mineru.net) API, which requires a token. Register at [mineru.net](https://mineru.net) and see the API docs at <https://mineru.net/apiManage/docs>. Then either put the token in `<root>/.mineru_token` (chmod 600) or export `MINERU_TOKEN`. Do this before anything else — without a valid token the pipeline stalls at the conversion stage.
+
+### 1. Clone and run from your project directory
+
+The data root defaults to `./reference-works/` relative to **where you run the command**, so run it from your project's directory (no `cd` into `autopaper`):
+
 ```bash
-cd autopaper
-python3 scripts/collect.py https://arxiv.org/abs/2504.08066 --repo SakanaAI/AI-Scientist-v2
+cd /path/to/your-project
+git clone <this-repo> .            # or clone elsewhere and reference the path below
+autopaper/collect.sh https://arxiv.org/abs/2504.08066 --repo SakanaAI/AI-Scientist-v2
 ```
 
-`collect.py` is the one-shot command: it takes exactly the same arguments as `add.py`, then runs the whole pipeline (fetch → MinerU convert → enrich → catalog) until `done` and prints the artifact path. Results land in `<root>/2504.08066/`:
+This creates `./reference-works/` under your project directory, and the result lands in `./reference-works/2504.08066/`:
 
 ```
-2504.08066/
+reference-works/2504.08066/
 ├── 2504.08066.pdf      # original paper
 ├── 2504.08066.md       # full text, MinerU conversion
 ├── images/             # figures referenced by the md
@@ -23,11 +32,13 @@ python3 scripts/collect.py https://arxiv.org/abs/2504.08066 --repo SakanaAI/AI-S
 └── meta.json           # canonical metadata: bibliography, sources, sha256, …
 ```
 
-Prerequisite: a MinerU API token — register at [mineru.net](https://mineru.net) and see the API docs at <https://mineru.net/apiManage/docs>. Put the token in `<root>/.mineru_token` (chmod 600), or export `MINERU_TOKEN`.
+`collect.py` is the one-shot command: it takes exactly the same arguments as `add.py`, then runs the whole pipeline (fetch → MinerU convert → enrich → catalog) until `done` and prints the artifact path.
+
+Shortcut: `autopaper/collect.sh` is a thin shell wrapper for the same command — run `autopaper/collect.sh <source> [--repo …] [--support …] [--doi …]` from any directory (bash/zsh).
 
 ## Commands
 
-All commands run from this directory as `python3 scripts/<cmd>.py …` and accept `--root <path>` (or env `REFERENCE_WORKS`; default `references/reference-works/`).
+All commands run from your project directory as `python3 autopaper/scripts/<cmd>.py …` and accept `--root <path>` (or env `REFERENCE_WORKS`; default `./reference-works/` under the current directory).
 
 | Command | Purpose |
 | --- | --- |
@@ -74,6 +85,7 @@ autopaper/
 ├── HINT.md                      # minimal reader for downstream AGENTS.md
 ├── prompts/summarize.md         # summarization prompt contract
 ├── tests/                       # unit tests (local only, not uploaded; run: python3 tests/test_identity.py)
+├── collect.sh                   # one-shot shortcut: autopaper/collect.sh …（bash/zsh）
 └── scripts/                     # all commands + shared modules, flat; run: python3 scripts/<cmd>.py
     ├── add.py collect.py run.py status.py retry.py enrich.py catalog.py support.py
     └── schema.py identity.py taskqueue.py registry.py sources.py fetch.py convert.py

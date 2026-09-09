@@ -33,9 +33,8 @@ MINERU_STATE_FILE = ".mineru_state.json"   # <id>/ 内, MinerU 批内子状态�
 ID_MAX_LEN = 64
 
 _CODE_ROOT = os.path.dirname(os.path.abspath(__file__))
-# 代码根 <repo>/autopaper/scripts/；默认数据根 <repo>/references/reference-works/
-_DEFAULT_ROOT = os.path.join(os.path.dirname(os.path.dirname(_CODE_ROOT)),
-                             "references", "reference-works")
+# 默认数据根 = 执行命令时的当前目录下的 ./reference-works（"." 即 cwd）
+_DEFAULT_ROOT = os.path.join(os.getcwd(), "reference-works")
 
 
 def now_str():
@@ -43,7 +42,7 @@ def now_str():
 
 
 def resolve_root(root=None):
-    """数据根解析：参数 > 环境变量 REFERENCE_WORKS > 默认 references/reference-works/。"""
+    """数据根解析：参数 > 环境变量 REFERENCE_WORKS > 默认 ./reference-works（相对执行目录）。"""
     r = root or os.environ.get("REFERENCE_WORKS") or _DEFAULT_ROOT
     r = os.path.abspath(r)
     return r

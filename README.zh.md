@@ -2,19 +2,28 @@
 
 `autopaper` 把研究工作（论文 / 预印本 / 代码项目）收集进一个结构化、自动判重的文献库。每篇被投递的工作会被下载、转化为 Markdown（MinerU）、富化题录元信息并编入索引——全程确定性脚本，无 LLM、无人工门禁。总结是可选的解耦阶段，由 agent 按需执行。
 
-本目录是**代码根**（脚本 + 提示词 + 文档，平铺）。数据在独立的**数据根**（默认 `references/reference-works/`），每条命令都可用 `--root` 指定。
+本目录是**代码根**（脚本 + 提示词 + 文档，平铺）。数据在独立的**数据根**（默认 `./reference-works/`，即执行命令时所在目录下），每条命令都可用 `--root` 指定。
 
 ## 快速上手
 
+### 0. 前置：MinerU API token
+
+autopaper 通过 [MinerU](https://mineru.net) API 把 PDF 转化为 Markdown，需要 token。在 [mineru.net](https://mineru.net) 注册，API 文档见 <https://mineru.net/apiManage/docs>。拿到 token 后写入 `<root>/.mineru_token`（权限 600），或设置环境变量 `MINERU_TOKEN`。**这一步最先做**——没有有效 token，流水线会卡在转化阶段。
+
+### 1. 从你的项目目录克隆并运行
+
+数据根默认是执行命令时所在目录下的 `./reference-works/`，所以在你的项目目录里运行即可（不要 `cd` 进 `autopaper`）：
+
 ```bash
-cd autopaper
-python3 scripts/collect.py https://arxiv.org/abs/2504.08066 --repo SakanaAI/AI-Scientist-v2
+cd /path/to/your-project
+git clone <本仓库> .            # 或克隆到别处，用下面的路径指过去
+autopaper/collect.sh https://arxiv.org/abs/2504.08066 --repo SakanaAI/AI-Scientist-v2
 ```
 
-`collect.py` 是一键命令：参数与 `add.py` 完全一致，受理后立即跑完全部流程（下载 → MinerU 转化 → 题录富化 → 索引刷新）直到 `done`，并打印产物路径。产物在 `<root>/2504.08066/`：
+这会在你的项目目录下创建 `./reference-works/`，产物在 `./reference-works/2504.08066/`：
 
 ```
-2504.08066/
+reference-works/2504.08066/
 ├── 2504.08066.pdf      # 原始论文
 ├── 2504.08066.md       # MinerU 转化全文
 ├── images/             # md 引用的图片
@@ -23,11 +32,13 @@ python3 scripts/collect.py https://arxiv.org/abs/2504.08066 --repo SakanaAI/AI-S
 └── meta.json           # 规范元信息：题录、来源、sha256 等
 ```
 
-准备：申请 MinerU API token——在 [mineru.net](https://mineru.net) 注册，API 文档见 <https://mineru.net/apiManage/docs>。token 写入 `<root>/.mineru_token`（权限 600），或设置环境变量 `MINERU_TOKEN`。
+`collect.py` 是一键命令：参数与 `add.py` 完全一致，受理后立即跑完全部流程（下载 → MinerU 转化 → 题录富化 → 索引刷新）直到 `done`，并打印产物路径。
+
+快捷方式：`autopaper/collect.sh` 是同一命令的薄封装——在任意目录运行 `autopaper/collect.sh <source> [--repo …] [--support …] [--doi …]` 即可（bash/zsh）。
 
 ## 命令一览
 
-所有命令在本目录以 `python3 scripts/<cmd>.py …` 运行，都接受 `--root <路径>`（或环境变量 `REFERENCE_WORKS`；默认 `references/reference-works/`）。
+所有命令在你项目的目录以 `python3 autopaper/scripts/<cmd>.py …` 运行，都接受 `--root <路径>`（或环境变量 `REFERENCE_WORKS`；默认 `./reference-works/`，即执行命令时的当前目录下）。
 
 | 命令 | 用途 |
 | --- | --- |
@@ -74,6 +85,7 @@ autopaper/
 ├── README.zh.md                 # 本文件
 ├── HINT.zh.md                   # 下游 AGENTS.md 用的最简导引
 ├── prompts/summarize.zh.md      # 总结提示词契约
+├── collect.sh                   # 一键快捷入口：autopaper/collect.sh …（bash/zsh）
 └── scripts/                     # 全部命令 + 共享模块（平铺）；运行：python3 scripts/<cmd>.py
     ├── add.py collect.py run.py status.py retry.py enrich.py catalog.py support.py
     └── schema.py identity.py taskqueue.py registry.py sources.py fetch.py convert.py
