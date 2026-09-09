@@ -16,7 +16,7 @@ autopaper 通过 [MinerU](https://mineru.net) API 把 PDF 转化为 Markdown，�
 
 ```bash
 cd /path/to/your-project
-git clone <本仓库> .            # 或克隆到别处，用下面的路径指过去
+git clone https://github.com/Nyanifold/autopaper.git .            # 或克隆到别处，用下面的路径指过去
 autopaper/collect.sh https://arxiv.org/abs/2504.08066 --repo SakanaAI/AI-Scientist-v2
 ```
 

@@ -16,7 +16,7 @@ The data root defaults to `./reference-works/` relative to **where you run the c
 
 ```bash
 cd /path/to/your-project
-git clone <this-repo> .            # or clone elsewhere and reference the path below
+git clone https://github.com/Nyanifold/autopaper.git .            # or clone elsewhere and reference the path below
 autopaper/collect.sh https://arxiv.org/abs/2504.08066 --repo SakanaAI/AI-Scientist-v2
 ```
 
