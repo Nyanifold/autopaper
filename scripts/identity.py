@@ -121,7 +121,13 @@ def classify(value):
         return {"type": "arxiv_id", "value": v}
     if v.startswith(("http://", "https://")):
         return {"type": "url", "value": v}
+    # 显式本地路径（./ ../ 或绝对路径）不当作 owner/repo
+    if v.startswith(("./", "../")) or v.startswith("/"):
+        return {"type": "pdf_path", "value": v}
     if OWNER_REPO_RE.match(v):
+        # 末段带扩展名（如 dir/paper.pdf）是本地文件，不是 owner/repo
+        if "." in v.rsplit("/", 1)[-1]:
+            return {"type": "pdf_path", "value": v}
         return {"type": "repo_only", "value": normalize_repo_url(v)}
     return {"type": "pdf_path", "value": v}
 
