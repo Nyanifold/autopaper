@@ -41,6 +41,17 @@ def test_registry():
     assert r["stage"] == "failed" and r["error_stage"] == "converting"
     # 列齐全
     assert set(schema.CSV_FIELDS) <= set(r.keys())
+
+    # repo 判重精确匹配：owner/repo 不得误命中 owner/repo-v2（子串匹配的旧 bug）
+    registry.register(root, {"task_id": "T-2-2"}, "repo-sakanaai-ai-scientist-v2",
+                      source_str="repo_only:https://github.com/SakanaAI/AI-Scientist-v2")
+    rows = registry.load(root)
+    hit, how = registry.find(rows, paper_id="repo-sakanaai-ai-scientist",
+                             repo_url="https://github.com/SakanaAI/AI-Scientist")
+    assert hit is None, (hit, how)
+    hit, how = registry.find(rows, paper_id="nope",
+                             repo_url="https://github.com/SakanaAI/AI-Scientist-v2")
+    assert hit["id"] == "repo-sakanaai-ai-scientist-v2" and how == "repo"
     print("test_registry: OK")
 
 

@@ -4,29 +4,96 @@ import os
 import shutil
 import subprocess
 import tarfile
+import time
 import zipfile
+from urllib.parse import urlsplit
 
 import requests
 
 import schema
+import sources
 from identity import normalize_repo_url, pdf_url_for
 
-UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"}
+UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
+      "Accept": "application/pdf,*/*"}
+DOWNLOAD_ATTEMPTS = 3
+
+
+def _env_int(name, default=0):
+    try:
+        return int(os.environ.get(name, "") or default)
+    except ValueError:
+        return default
+
+
+# 单文件下载上限（字节）；0 = 不限制。环境变量 AUTOPAPER_MAX_PDF_BYTES。
+PDF_MAX_BYTES = _env_int("AUTOPAPER_MAX_PDF_BYTES", 0)
+
+
+class PdfTooLarge(RuntimeError):
+    pass
 
 
 def sha256_file(path):
     return schema.sha256_file(path)
 
 
-def download(url, dest):
-    tmp = dest + ".part"
-    with requests.get(url, headers=UA, timeout=300, stream=True) as resp:
+def _unlink(path):
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+    except OSError:
+        pass
+
+
+def _referer(url):
+    p = urlsplit(url)
+    return f"{p.scheme}://{p.netloc}/" if p.netloc else None
+
+
+def _download_once(url, tmp, headers):
+    with requests.get(url, headers=headers, timeout=300, stream=True) as resp:
         resp.raise_for_status()
+        total = 0
         with open(tmp, "wb") as f:
             for chunk in resp.iter_content(65536):
+                total += len(chunk)
+                if PDF_MAX_BYTES and total > PDF_MAX_BYTES:
+                    raise PdfTooLarge(
+                        f"PDF exceeds AUTOPAPER_MAX_PDF_BYTES={PDF_MAX_BYTES}")
                 f.write(chunk)
-    os.replace(tmp, dest)
-    return dest
+
+
+def download(url, dest, referer=None, attempts=DOWNLOAD_ATTEMPTS):
+    """流式下载到 dest；失败重试 attempts 次，落 .part 再原子改名，失败清理 .part。"""
+    tmp = dest + ".part"
+    headers = dict(UA)
+    if referer:
+        headers["Referer"] = referer
+    last = None
+    for i in range(attempts):
+        try:
+            _download_once(url, tmp, headers)
+        except requests.RequestException as exc:
+            last = exc
+            _unlink(tmp)
+            if i + 1 < attempts:
+                time.sleep(2 ** i)
+            continue
+        except PdfTooLarge:
+            _unlink(tmp)
+            raise
+        os.replace(tmp, dest)
+        return dest
+    raise RuntimeError(f"download failed after {attempts} attempts: {url} ({last})")
+
+
+def assert_pdf(path):
+    """校验文件像 PDF（头部 1KB 内出现 %PDF-），防止把 HTML 错误页当 PDF 存下。"""
+    with open(path, "rb") as f:
+        head = f.read(1024)
+    if b"%PDF-" not in head:
+        raise RuntimeError(f"downloaded file is not a PDF (no %PDF- header): {path}")
 
 
 def repo_dir_name(repo_url):
@@ -103,13 +170,14 @@ def fetch_paper(root, paper_id, task):
         dest_pdf = os.path.join(pdir, f"{paper_id}.pdf")
         if src["type"] == "pdf_path":
             src_path = src["value"]
-            if os.path.abspath(src_path) != os.path.abspath(dest_pdf):
+            if os.path.abspath(src_path) != os.path.abspath(dest_pdf) and not os.path.exists(dest_pdf):
                 shutil.copyfile(src_path, dest_pdf)
         elif not os.path.exists(dest_pdf):
-            url = pdf_url_for(src, paper_id)
+            url = pdf_url_for(src, paper_id) or sources.find_pdf_url(paper_id, task.get("doi"))
             if not url:
                 raise RuntimeError(f"cannot determine PDF download URL: {src}")
-            download(url, dest_pdf)
+            download(url, dest_pdf, referer=_referer(url))
+            assert_pdf(dest_pdf)
         if os.path.exists(dest_pdf):
             pdf_info = {"local": f"{paper_id}.pdf",
                         "source": src["value"],

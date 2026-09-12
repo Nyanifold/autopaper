@@ -35,8 +35,11 @@ def find(rows, paper_id=None, pdf_sha256=None, repo_url=None, exclude_task=None)
             if r.get("pdf_sha256") == pdf_sha256:
                 return r, "pdf_sha256"
     if repo_url:
+        # repo-only 的 source 形如 "repo_only:<规范化 URL>"，必须精确匹配：
+        # 子串匹配会让 owner/repo 误命中 owner/repo-v2。
+        want = f"repo_only:{repo_url}"
         for r in rows.values():
-            if repo_url in (r.get("source") or ""):
+            if (r.get("source") or "") == want:
                 return r, "repo"
     return None, None
 

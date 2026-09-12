@@ -6,9 +6,21 @@
 
 ## 快速上手
 
-### 0. 前置：MinerU API token
+### 0. 前置：选一个 MinerU 转化后端
 
-autopaper 通过 [MinerU](https://mineru.net) API 把 PDF 转化为 Markdown，需要 token。在 [mineru.net](https://mineru.net) 注册，API 文档见 <https://mineru.net/apiManage/docs>。拿到 token 后写入 `<root>/.mineru_token`（权限 600），或设置环境变量 `MINERU_TOKEN`。**这一步最先做**——没有有效 token，流水线会卡在转化阶段。
+autopaper 通过 MinerU 把 PDF 转成 Markdown。在数据根（`<root>/`）配置后端；若多个同时存在，按优先级择高：
+
+| 优先级 | `<root>/` 配置 | 环境变量 | 后端 |
+| --- | --- | --- | --- |
+| 1 | `.mineru_url` | `MINERU_URL` | 本地/远程 `mineru-api` 服务，如 `http://127.0.0.1:8000`——无需 token |
+| 2 | `.mineru_command` | `MINERU_COMMAND` | 本机 `mineru` 命令（本机已安装）；文件内容即命令，空文件表示 `mineru` |
+| 3 | `.mineru_token` | `MINERU_TOKEN` | 在线 [MinerU](https://mineru.net) API——注册，文档见 <https://mineru.net/apiManage/docs>，权限 600 |
+
+- **本地服务**——先启动 `mineru-api`（默认 `127.0.0.1:8000`），再让 autopaper 指过去：`echo http://127.0.0.1:8000 > <root>/.mineru_url`。自部署 `mineru-api` 无需认证。后端与 OCR 语言默认 `hybrid-engine` / `ch`，可用 `MINERU_BACKEND` / `MINERU_LANG` 覆盖。
+- **本地命令**——`mineru` 在 `PATH` 上时，创建文件即可：`touch <root>/.mineru_command`。autopaper 执行 `<command> -p <paper>.pdf -o <tmp>`，回收 Markdown 与 `images/`。需要额外参数就写进文件（例如纯 CPU 机器写 `mineru -b pipeline`）。模型需已下载（`mineru-models-download`）。
+- **在线**——兜底：token 写入 `<root>/.mineru_token`（权限 600）或设 `MINERU_TOKEN`。
+
+**这一步最先做**——没有可用后端，流水线会卡在转化阶段。从零安装 MinerU（模型、`mineru-api` 服务或 CLI）见 [`MINERU.md`](MINERU.md)。
 
 ### 1. 从你的项目目录克隆并运行
 
@@ -17,6 +29,7 @@ autopaper 通过 [MinerU](https://mineru.net) API 把 PDF 转化为 Markdown，�
 ```bash
 cd /path/to/your-project
 git clone https://github.com/Nyanifold/autopaper.git .            # 或克隆到别处，用下面的路径指过去
+pip install -r autopaper/requirements.txt                          # 运行时依赖：requests
 autopaper/collect.sh https://arxiv.org/abs/2504.08066 --repo SakanaAI/AI-Scientist-v2
 ```
 
@@ -56,7 +69,8 @@ reference-works/2504.08066/
 
 ### 关于来源的说明
 
-- **优先用规范标识**：arXiv URL/id 与 DOI 能自动抓到完整题录。出版社页面 URL（如 `pubs.aip.org/…`）不含 DOI 且页面有反爬——会退化为 `web-<hash>` id、抓不到题录。只有这类 URL 时，先查它的 DOI（如用 [Crossref](https://search.crossref.org/)），改投 `https://doi.org/<doi>`。
+- **优先用规范标识**：arXiv URL/id 与 `https://doi.org/<doi>` 能自动抓到完整题录。出版社页面 URL（如 `pubs.aip.org/…`）不含 DOI 且页面有反爬——会退化为 `web-<hash>` id，且 fetching 阶段因推不出 PDF 地址而失败。只有这类 URL 时，先查它的 DOI（如用 [Crossref](https://search.crossref.org/)），改投 `https://doi.org/<doi>`。
+- **哪些能自动下载 PDF**：arXiv（含旧式 `cs/0701001`）、bioRxiv / medRxiv、以及任何以 `.pdf` 结尾的 URL。`doi-…` id 与 chemRxiv 会在 fetch 阶段反推 DOI 后查 Crossref 的 PDF 链接——best-effort，Crossref 没有登记时 fetching 失败。下载失败重试 3 次、拒绝非 PDF 响应，可用 `AUTOPAPER_MAX_PDF_BYTES` 限制大小。
 - **付费墙或无法下载的 PDF**：手动下载后投本地路径（`collect.py … /path/to/paper.pdf`）或丢进 `_inbox/`。**文件名尽量用 DOI 命名**（如 `10.1063_5.0287366.pdf`，`/` 可写成 `_`）——这样 id 规则识别为 `doi-…`，enrich 能抓到题录；随意命名（`paper.pdf`）会退化为 `file-<hash>` id，没有元信息。也可以显式提供 DOI：`--doi 10.xxxx/…`（文件名不规范时优先用此法）。
 
 ### 投递盒
@@ -70,13 +84,17 @@ registered → fetching → converting → enriching → (summarizing) → catal
 ```
 
 - 论文级状态在 `<root>/processed.csv`（唯一事实源）；任务级回执在 `<root>/_queue/<task-id>.json`（`queued/running/done/duplicate/rejected`）；事件追加到 `<root>/events.log`。
-- 任何中断：重跑同一命令即续传，不重复下载/解析。MinerU 转化失败可换 `vlm` 模型或拆页后用 `retry.py` 续跑。
+- 任何中断：重跑同一命令即续传，不重复下载/解析。MinerU 转化失败用 `retry.py` 从失败阶段续跑；要换在线模型，在重试前设置 `MINERU_MODEL_VERSION`（默认 `vlm`）。
 - MinerU 限制：单文件 ≤200 页、每日优先页额度。批量时建议 `run.py --until converting` 分段跑。
 - 若 PDF 无法下载（付费墙/链接失效）：手动下载后用本地路径投递，或丢进 `_inbox/`。
 
 ## 总结（可选，agent 驱动）
 
-刻意**没有 `summarize.py`**。`summary.md`——中立、锚定到转化后 md 的总结——由 agent 按提示词契约 `prompts/summarize.zh.md` 现场产出。事实小节（题录/目录内容/仓库结构）从 `meta.json` + 目录扫描确定性组装，LLM 只写归纳部分。没有总结论文照样到 `done`；catalog 的摘要列待总结落地后自动补上。
+刻意**没有 `summarize.py`**。`summary.md`——中立、锚定到转化后 md 的总结——由 agent 按提示词契约 `prompts/summarize.zh.md` 现场产出。事实小节（题录/目录内容/仓库结构）从 `meta.json` + 目录扫描确定性组装，LLM 只写归纳部分。没有总结论文照样到 `done`。`catalog.py` 会读取找到的 `<id>/summary.md`：填充 catalog 的 `summary` 列、从 summary 的 `## Tags` 段取 tags（缺失时回退 `meta.json`），并把 `summary_file` / `summary_hash` 记入 `processed.csv`。产出总结后重跑 `catalog.py` 即可。
+
+## 在其他任务中复用文献库
+
+`HINT.md`（英文）/ `HINT.zh.md`（中文）是给消费方 agent 的最简导引。在更大或更复杂的任务中，可以把它的内容复制进消费方项目的 `AGENTS.md`（或等价的全局说明），让该 agent 知道文献库的目录结构与读取、引用方式。HINT 只描述如何读取数据根；它假定 `autopaper/` 代码根仍可用于追加文献。
 
 ## 目录结构
 
@@ -84,7 +102,10 @@ registered → fetching → converting → enriching → (summarizing) → catal
 autopaper/
 ├── README.zh.md                 # 本文件
 ├── HINT.zh.md                   # 下游 AGENTS.md 用的最简导引
+├── MINERU.md                    # 本地 MinerU（命令或服务）安装/启动指南（英文）
+├── requirements.txt             # 运行时依赖：requests
 ├── prompts/summarize.zh.md      # 总结提示词契约
+├── tests/                       # 离线单测；运行：python3 tests/test_<module>.py
 ├── collect.sh                   # 一键快捷入口：autopaper/collect.sh …（bash/zsh）
 └── scripts/                     # 全部命令 + 共享模块（平铺）；运行：python3 scripts/<cmd>.py
     ├── add.py collect.py run.py status.py retry.py enrich.py catalog.py support.py

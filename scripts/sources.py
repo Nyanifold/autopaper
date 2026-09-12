@@ -38,15 +38,22 @@ def fetch_arxiv(arxiv_id):
                     "doi": doi_el.text if doi_el is not None else None}}
 
 
-def fetch_crossref(doi):
-    """Crossref -> 题录 dict；失败返回 None。"""
+def _crossref_message(doi):
+    """Crossref works/{doi} -> message dict；失败返回 None。"""
     try:
         resp = requests.get(f"https://api.crossref.org/works/{doi}",
                             headers=UA, timeout=30)
         if resp.status_code != 200:
             return None
-        m = resp.json()["message"]
+        return resp.json()["message"]
     except (requests.RequestException, ValueError, KeyError):
+        return None
+
+
+def fetch_crossref(doi):
+    """Crossref -> 题录 dict；失败返回 None。"""
+    m = _crossref_message(doi)
+    if m is None:
         return None
     authors = [" ".join(filter(None, [a.get("given"), a.get("family")]))
                for a in m.get("author", [])]
@@ -63,16 +70,52 @@ def fetch_crossref(doi):
             "web": {"doi": f"https://doi.org/{doi}"}}
 
 
-def fetch_biblio(paper_id):
-    """按 id 形态选 adapter；抓不到返回 None（不猜测）。"""
-    if re.match(r"^\d{4}\.\d{4,5}(v\d+)?$", paper_id):
-        return fetch_arxiv(paper_id)
-    if re.match(r"^\d{4}\.\d{2}\.\d{2}\.\d{4,7}(v\d+)?$", paper_id):
-        return fetch_crossref(f"10.1101/{paper_id}")
+def doi_for_id(paper_id):
+    """由 paper_id 反推 DOI；推不出返回 None。"""
+    if paper_id.startswith("doi-"):
+        return paper_id[4:].replace("-", "/", 1)
     m = re.match(r"^chemrxiv\.(\d+)(?:\.v(\d+))?$", paper_id)
     if m:
-        doi = f"10.26434/chemrxiv.{m.group(1)}" + (f".v{m.group(2)}" if m.group(2) else "")
+        return f"10.26434/chemrxiv.{m.group(1)}" + (f".v{m.group(2)}" if m.group(2) else "")
+    if re.match(r"^\d{4}\.\d{2}\.\d{2}\.\d{4,7}(v\d+)?$", paper_id):
+        return f"10.1101/{paper_id}"
+    return None
+
+
+def _arxiv_raw_id(paper_id):
+    """新式 id 原样；旧式路径安全 id（arxiv-cs-0701001）还原为 cs/0701001；否则 None。"""
+    if re.match(r"^\d{4}\.\d{4,5}(v\d+)?$", paper_id):
+        return paper_id
+    if paper_id.startswith("arxiv-"):
+        arc, _, num = paper_id[len("arxiv-"):].rpartition("-")
+        if arc and re.match(r"^\d{7}(v\d+)?$", num):
+            return f"{arc}/{num}"
+    return None
+
+
+def fetch_biblio(paper_id):
+    """按 id 形态选 adapter；抓不到返回 None（不猜测）。"""
+    raw = _arxiv_raw_id(paper_id)
+    if raw:
+        return fetch_arxiv(raw)
+    doi = doi_for_id(paper_id)
+    if doi:
         return fetch_crossref(doi)
-    if paper_id.startswith("doi-"):
-        return fetch_crossref(paper_id[4:].replace("-", "/", 1))
+    return None
+
+
+def find_pdf_url(paper_id, explicit_doi=None):
+    """在线回退找 PDF：由 id / 显式 DOI 反推 DOI，再查 Crossref link。找不到返回 None。
+
+    best-effort：Crossref 不一定登记 PDF 直链；本函数只认 content-type 含 pdf 的 link。
+    """
+    doi = explicit_doi or doi_for_id(paper_id)
+    if not doi:
+        return None
+    m = _crossref_message(doi)
+    if m is None:
+        return None
+    for link in m.get("link") or []:
+        if "pdf" in (link.get("content-type") or "").lower() and link.get("URL"):
+            return link["URL"]
     return None

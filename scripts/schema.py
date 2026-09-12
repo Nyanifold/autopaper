@@ -28,6 +28,8 @@ EVENTS_LOG = "events.log"
 CATALOG_JSON = "catalog.json"
 CATALOG_MD = "catalog.md"
 MINERU_TOKEN_FILE = ".mineru_token"
+MINERU_URL_FILE = ".mineru_url"            # <root>/ 内, 本地/远程 mineru-api 地址
+MINERU_COMMAND_FILE = ".mineru_command"    # <root>/ 内, 本机 mineru 命令（缺失时默认 mineru）
 MINERU_STATE_FILE = ".mineru_state.json"   # <id>/ 内, MinerU 批内子状态承载
 
 ID_MAX_LEN = 64
@@ -96,6 +98,21 @@ def load_token(root, env_name, file_name):
 
 def mineru_token(root):
     return load_token(root, "MINERU_TOKEN", MINERU_TOKEN_FILE)
+
+
+def mineru_url(root):
+    """本地/远程 mineru-api 服务地址；未配置返回 None（环境变量 MINERU_URL 优先）。"""
+    return load_token(root, "MINERU_URL", MINERU_URL_FILE) or None
+
+
+def mineru_command(root):
+    """本机 mineru 命令串；未配置返回 None，配置为空则用默认 `mineru`（环境变量 MINERU_COMMAND 优先）。"""
+    v = load_token(root, "MINERU_COMMAND", MINERU_COMMAND_FILE)
+    if v:
+        return v
+    if os.path.exists(os.path.join(root, MINERU_COMMAND_FILE)):
+        return "mineru"
+    return None
 
 
 def sha256_str(s):
