@@ -49,12 +49,15 @@ reference-works/2504.08066/
 
 快捷方式：`autopaper/collect.sh` 是同一命令的薄封装——在任意目录运行 `autopaper/collect.sh <source> [--repo …] [--support …] [--doi …]` 即可（bash/zsh）。
 
+想先建好数据根，运行 `autopaper/init.sh`——它在 `./reference-works/`（或你作为参数传入的目录）下创建期待的 `_inbox/`、`_queue/`、台账与索引文件。幂等，且不会覆盖已有数据。
+
 ## 命令一览
 
-所有命令在你项目的目录以 `python3 autopaper/scripts/<cmd>.py …` 运行，都接受 `--root <路径>`（或环境变量 `REFERENCE_WORKS`；默认 `./reference-works/`，即执行命令时的当前目录下）。
+所有命令在你项目的目录以 `python3 autopaper/scripts/<cmd>.py …` 运行，都接受 `--root <路径>`（或环境变量 `REFERENCE_WORKS`；默认 `./reference-works/`，即执行命令时的当前目录下）。`init.sh` 与 `collect.sh` 是直接运行的 shell 入口。
 
 | 命令 | 用途 |
 | --- | --- |
+| `init.sh [DIR]` | 创建期待的数据根结构（幂等、不覆盖已有数据）；默认 `./reference-works/` |
 | `collect.py <source> [--repo …]* [--support …]*` | **一键**：投递 + 执行全部流程到 `done` |
 | `add.py <source> [--repo …]* [--support …]* [--wait]` | 只投递+受理；打印 `task_id` |
 | `add.py --inbox <name>.pdf […]` | 给 `_inbox/` 中已有的 PDF 补投元信息（repo/support） |
@@ -107,6 +110,7 @@ autopaper/
 ├── prompts/summarize.zh.md      # 总结提示词契约
 ├── tests/                       # 离线单测；运行：python3 tests/test_<module>.py
 ├── collect.sh                   # 一键快捷入口：autopaper/collect.sh …（bash/zsh）
+├── init.sh                      # 数据根初始化：autopaper/init.sh [DIR]（bash/zsh）
 └── scripts/                     # 全部命令 + 共享模块（平铺）；运行：python3 scripts/<cmd>.py
     ├── add.py collect.py run.py status.py retry.py enrich.py catalog.py support.py
     └── schema.py identity.py taskqueue.py registry.py sources.py fetch.py convert.py

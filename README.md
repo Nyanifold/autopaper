@@ -49,12 +49,15 @@ reference-works/2504.08066/
 
 Shortcut: `autopaper/collect.sh` is a thin shell wrapper for the same command — run `autopaper/collect.sh <source> [--repo …] [--support …] [--doi …]` from any directory (bash/zsh).
 
+To create the data root up front, run `autopaper/init.sh` — it builds `./reference-works/` (or the directory you pass as its argument) with the expected `_inbox/`, `_queue/`, ledger and catalog files. It is idempotent and never overwrites existing data.
+
 ## Commands
 
-All commands run from your project directory as `python3 autopaper/scripts/<cmd>.py …` and accept `--root <path>` (or env `REFERENCE_WORKS`; default `./reference-works/` under the current directory).
+All commands run from your project directory as `python3 autopaper/scripts/<cmd>.py …` and accept `--root <path>` (or env `REFERENCE_WORKS`; default `./reference-works/` under the current directory). `init.sh` and `collect.sh` are shell entry points run directly.
 
 | Command | Purpose |
 | --- | --- |
+| `init.sh [DIR]` | Create the expected data-root structure (idempotent, never overwrites); default `./reference-works/` |
 | `collect.py <source> [--repo …]* [--support …]*` | **One-shot**: submit + run everything to `done` |
 | `add.py <source> [--repo …]* [--support …]* [--wait]` | Submit + register only; prints `task_id` |
 | `add.py --inbox <name>.pdf […]` | Attach metadata (repo/support) to a PDF already in `_inbox/` |
@@ -106,6 +109,7 @@ autopaper/
 ├── prompts/summarize.md         # summarization prompt contract
 ├── tests/                       # offline unit tests; run: python3 tests/test_<module>.py
 ├── collect.sh                   # one-shot shortcut: autopaper/collect.sh …（bash/zsh）
+├── init.sh                      # data-root initializer: autopaper/init.sh [DIR]（bash/zsh）
 └── scripts/                     # all commands + shared modules, flat; run: python3 scripts/<cmd>.py
     ├── add.py collect.py run.py status.py retry.py enrich.py catalog.py support.py
     └── schema.py identity.py taskqueue.py registry.py sources.py fetch.py convert.py
